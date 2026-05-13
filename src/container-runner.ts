@@ -163,7 +163,11 @@ function buildVolumeMounts(
   // The credential proxy's create_api_key exchange requires org:create_api_key
   // scope which Claude Pro subscription tokens do not have.
   if (detectAuthMode() === 'oauth') {
-    const hostCredsFile = path.join(os.homedir(), '.claude', '.credentials.json');
+    const hostCredsFile = path.join(
+      os.homedir(),
+      '.claude',
+      '.credentials.json',
+    );
     if (fs.existsSync(hostCredsFile)) {
       const sessionCredsFile = path.join(groupSessionsDir, '.credentials.json');
       fs.copyFileSync(hostCredsFile, sessionCredsFile);
