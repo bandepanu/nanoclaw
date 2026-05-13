@@ -19,7 +19,7 @@ AskUserQuestion: "Which group should have the wiki?"
 2. **Dedicated group** — create a new group just for the wiki
 3. **Other** — pick an existing group
 
-If dedicated: ask which channel and chat, then register with `npx tsx setup/index.ts --step register`.
+If dedicated: ask which channel and chat, then register with `pnpm exec tsx setup/index.ts --step register`.
 
 ## Step 3: Design collaboratively
 
@@ -41,7 +41,12 @@ Create a `container/skills/wiki/SKILL.md` tailored to this user's wiki. This is 
 
 ### 3c. Group CLAUDE.md
 
-Add a wiki section to the group's CLAUDE.md that activates the wiki behavior and points to the container skill. It should concisely explain the system and have an index of the key files and folders.
+Edit the group's CLAUDE.md to add a wiki section. This is critical — it's what turns the agent into a wiki maintainer. It should:
+
+- Explain the wiki system concisely: what it is, the three layers (sources, wiki, schema), the three operations (ingest, query, lint)
+- Index the key files and folders (`wiki/`, `sources/`, `wiki/index.md`, `wiki/log.md`)
+- Point to the container skill for detailed workflow
+- **Ingest discipline:** Be very explicit that when the user provides multiple files or points at a folder with many files, the agent MUST process them one at a time. For each file: read it, discuss takeaways, create/update all wiki pages (summary, entities, concepts, cross-references, index, log), and completely finish with that file before moving to the next. Never batch-read all files and then process them together — this produces shallow, generic pages instead of the deep integration the pattern requires.
 
 ## Step 4: Source handling capabilities
 
@@ -66,13 +71,11 @@ AskUserQuestion: "Want periodic wiki health checks?"
 2. **Monthly**
 3. **Skip** — lint manually
 
-If yes, schedule via `mcp__nanoclaw__schedule_task` with a prompt based on the pattern's Lint operation.
+If yes, ask the agent to schedule the lint task using the `schedule_task` MCP tool in conversation.
 
-## Step 6: Build and restart
+## Step 6: Restart
 
 ```bash
-npm run build
-./container/build.sh
 launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
 # Linux: systemctl --user restart nanoclaw
 ```
