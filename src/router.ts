@@ -369,6 +369,8 @@ function evaluateEngage(
   threadId: string | null,
 ): boolean {
   switch (agent.engage_mode) {
+    case 'always':
+      return true;
     case 'pattern': {
       const pat = agent.engage_pattern ?? '.';
       if (pat === '.') return true;

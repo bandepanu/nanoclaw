@@ -97,7 +97,7 @@ export interface UserDm {
   resolved_at: string;
 }
 
-export type EngageMode = 'pattern' | 'mention' | 'mention-sticky';
+export type EngageMode = 'always' | 'pattern' | 'mention' | 'mention-sticky';
 export type SenderScope = 'all' | 'known';
 export type IgnoredMessagePolicy = 'drop' | 'accumulate';
 

@@ -271,6 +271,7 @@ function buildMounts(
   // Agent group folder at /workspace/agent (RW for working files + CLAUDE.local.md)
   mounts.push({ hostPath: groupDir, containerPath: '/workspace/agent', readonly: false });
 
+
   // container.json — nested RO mount on top of RW group dir so the agent
   // can read its config but cannot modify it.
   const containerJsonPath = path.join(groupDir, 'container.json');
@@ -334,6 +335,13 @@ function buildMounts(
 
   const homeDir = os.homedir();
 
+  // S3-backed wiki storage — overlay /workspace/agent/wiki with ~/s3/nanowiki
+  // so the wiki agent writes directly to S3.
+  const s3WikiDir = path.join(homeDir, 's3', 'nanowiki');
+  if (agentGroup.folder === 'wiki' && fs.existsSync(s3WikiDir)) {
+    mounts.push({ hostPath: s3WikiDir, containerPath: '/workspace/agent/wiki', readonly: false });
+  }
+
   // OAuth credential copy — copy host credentials into session dir so the
   // container can authenticate with Claude when OneCLI is not configured.
   // The session .claude/ dir is already mounted at /workspace/.claude via
@@ -341,10 +349,10 @@ function buildMounts(
   // finds them without needing a separate mount.
   const hostCredsFile = path.join(homeDir, '.claude', '.credentials.json');
   if (fs.existsSync(hostCredsFile)) {
-    const sessionClaudeDir = path.join(sessDir, '.claude');
-    if (!fs.existsSync(sessionClaudeDir)) fs.mkdirSync(sessionClaudeDir, { recursive: true });
-    const sessionCredsFile = path.join(sessionClaudeDir, '.credentials.json');
-    fs.copyFileSync(hostCredsFile, sessionCredsFile);
+    // claudeDir is mounted at /home/node/.claude — that's where Claude Code reads credentials.
+    if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
+    const destCredsFile = path.join(claudeDir, '.credentials.json');
+    fs.copyFileSync(hostCredsFile, destCredsFile);
   }
 
   // gcalcli — config dir + token/data dir (pre-authed for host calendar)

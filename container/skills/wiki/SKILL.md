@@ -21,6 +21,8 @@ attachments/
 
 Triggered when the user drops a source (URL, PDF, image, voice note) or says "add this", "read this", "ingest".
 
+**Critical rule: process one source fully before starting the next.** Never batch-read multiple sources and process them together.
+
 1. Read/fetch the source fully (see Source Handling below)
 2. Save it to `sources/` if it's a file
 3. Extract key facts, ideas, people, concepts
@@ -53,6 +55,49 @@ Report findings and suggest sources or investigations to pursue.
 
 ## Source Handling
 
+### YouTube URLs
+YouTube requires a dedicated path — do NOT use agent-browser (too slow, will time out).
+
+```bash
+# Install yt-dlp if not present (one-time, ~5 sec)
+command -v yt-dlp >/dev/null 2>&1 || pip3 install -q yt-dlp
+
+# Extract video ID from youtu.be/<id> or youtube.com/watch?v=<id>
+VIDEO_ID=$(python3 -c "
+import sys, re
+url = '<url>'
+m = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', url)
+print(m.group(1) if m else '')
+")
+
+# Download metadata + auto-captions (no video download)
+yt-dlp \
+  --write-info-json \
+  --write-auto-subs --write-subs --sub-langs en \
+  --sub-format vtt \
+  --skip-download \
+  --no-playlist \
+  -o "sources/${VIDEO_ID}.%(ext)s" \
+  "https://www.youtube.com/watch?v=${VIDEO_ID}" 2>/dev/null || true
+
+# The .info.json has title, description, channel, upload_date, tags
+# The .vtt has the auto-transcript — strip timing cues for readable text
+python3 -c "
+import re, glob
+for f in glob.glob('sources/${VIDEO_ID}*.vtt'):
+    txt = open(f).read()
+    # strip WebVTT header and timing lines
+    lines = [l for l in txt.splitlines()
+             if l and not re.match(r'^(WEBVTT|\d\d:\d\d|NOTE|<\d)', l)]
+    # deduplicate consecutive lines (VTT repeats captions)
+    deduped = [lines[i] for i in range(len(lines))
+               if i == 0 or lines[i] != lines[i-1]]
+    open(f.replace('.vtt','.txt'), 'w').write('\n'.join(deduped))
+" 2>/dev/null || true
+```
+
+Read `sources/${VIDEO_ID}.info.json` for metadata and `sources/${VIDEO_ID}*.txt` for the transcript. If no transcript file was produced (video has no captions), use the description from info.json as the primary text.
+
 ### URLs
 Do NOT use WebFetch (returns summaries). Download the full document:
 ```bash
@@ -75,26 +120,29 @@ If the page requires JavaScript, use `agent-browser` to open it and extract full
 ### PDFs
 PDFs sent via WhatsApp are auto-saved to `attachments/`. Extract text with:
 ```bash
-pdf-reader extract attachments/<filename>.pdf
+pdftotext attachments/<filename>.pdf -
 ```
 For PDFs from URLs:
 ```bash
 curl -sLo sources/<filename>.pdf "<url>"
-pdf-reader extract sources/<filename>.pdf
+pdftotext sources/<filename>.pdf -
 ```
 
 ### Images / Screenshots
 Use the vision capability to read the image. Describe what you see and extract any text or data.
 
 ### Voice Notes
-Voice notes are transcribed automatically before reaching you. Treat the transcript as the source text.
+Voice notes sent via WhatsApp are audio files in `attachments/`. Transcribe with available tools, then treat the transcript as the source text.
+
+### Plain Text / Pastes
+The pasted content is the source. No download needed — extract and integrate directly.
 
 ## Wiki Page Format
 
 ```markdown
 # <Title>
 
-> Sources: [[source1]], [[source2]] | Updated: YYYY-MM-DD
+> Sources: [source1](../sources/source1.html), [source2](../sources/source2.pdf) | Updated: YYYY-MM-DD
 
 One-paragraph summary.
 
@@ -102,13 +150,13 @@ One-paragraph summary.
 - ...
 
 ## Related
-- [[related-page]] — why it's related
+- [related-page](related-page.md) — why it's related
 ```
 
 ## Conventions
 
 - One concept/person/theme per page — don't merge unrelated topics
-- Cross-link aggressively: `[[page-name]]` for any related page that exists
-- Flag contradictions inline: `> ⚠️ Contradicts [[other-page]]: ...`
+- Cross-link aggressively: `[page-name](page-name.md)` for any related page that exists
+- Flag contradictions inline: `> ⚠️ Contradicts [other-page](other-page.md): ...`
 - Keep pages factual — save your synthesis for a dedicated synthesis page
 - The index is your navigation tool — keep it current and accurate

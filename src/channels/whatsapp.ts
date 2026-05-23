@@ -580,17 +580,14 @@ registerChannelAdapter('whatsapp', {
               : rawSender;
             const senderName = msg.pushName || sender.split('@')[0];
             const fromMe = msg.key.fromMe || false;
-            // Filter bot's own messages to prevent echo loops.
-            // In self-chat (user messaging their own number), all messages have
-            // fromMe=true — use sentMessageCache to distinguish bot echoes from
-            // user-typed messages. For all other chats, the blanket fromMe
-            // filter is correct since the user's phone messages shouldn't wake
-            // the agent in third-party conversations.
-            if (fromMe) {
-              const isSelfChat = botPhoneJid && chatJid === botPhoneJid;
-              if (!isSelfChat) continue;
-              if (sentMessageCache.has(msg.key.id || '')) continue;
-            }
+            // Filter bot's own outgoing messages to prevent echo loops.
+            // sentMessageCache tracks every message ID the bot sent — anything
+            // in the cache is a bot echo, drop it. Anything NOT in the cache
+            // with fromMe=true is the owner typing from their own phone in a
+            // shared-number setup (e.g. sending to a wired group like Claudechat
+            // or NanoWiki). Let those through; the router discards them if the
+            // chat isn't wired.
+            if (fromMe && sentMessageCache.has(msg.key.id || '')) continue;
 
             const isBotMessage = ASSISTANT_HAS_OWN_NUMBER ? false : content.startsWith(`${ASSISTANT_NAME}:`);
 
